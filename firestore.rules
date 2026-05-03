@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+
+      match /savedJobs/{jobId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
+
+      match /applications/{applicationId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
+
+      match /resumeResults/{resultId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
+    }
+  }
+}
