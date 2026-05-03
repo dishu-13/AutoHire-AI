@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.daksh.smartjobassistant"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -21,7 +21,7 @@ android {
     defaultConfig {
         applicationId = "com.daksh.smartjobassistant"
         minSdk = 21
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
