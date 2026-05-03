@@ -32,6 +32,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Decode Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release-key.jks
+
       - name: Build APK
         run: flutter build apk --release
 
