@@ -13,6 +13,7 @@ class JobCard extends StatelessWidget {
     required this.onSave,
     required this.onTrack,
     required this.onView,
+    this.matchScore,
   });
 
   final Job job;
@@ -21,6 +22,7 @@ class JobCard extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onTrack;
   final VoidCallback onView;
+  final int? matchScore;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +68,30 @@ class JobCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (matchScore != null && matchScore! > 0)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: matchScore! >= 70
+                          ? Colors.green.withOpacity(0.2)
+                          : matchScore! >= 50
+                              ? Colors.orange.withOpacity(0.2)
+                              : Colors.red.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$matchScore% Match',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: matchScore! >= 70
+                            ? Colors.green.shade700
+                            : matchScore! >= 50
+                                ? Colors.orange.shade700
+                                : Colors.red.shade700,
+                      ),
+                    ),
+                  ),
                 IconButton(
                   tooltip: isSaved ? 'Remove saved job' : 'Save job',
                   onPressed: onSave,

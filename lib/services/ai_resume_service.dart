@@ -57,6 +57,29 @@ class AiResumeService {
     );
   }
 
+  int calculateMatchScore({
+    required String resumeText,
+    required String targetJobDescription,
+  }) {
+    final resume = resumeText.trim();
+    final jobDescription = targetJobDescription.trim();
+    if (resume.isEmpty || jobDescription.isEmpty) return 0;
+
+    final keywords = _extractKeywords(jobDescription);
+    if (keywords.isEmpty) return 0;
+
+    final resumeLower = resume.toLowerCase();
+    final matched = keywords
+        .where((keyword) => resumeLower.contains(keyword.toLowerCase()))
+        .toList();
+
+    return _scoreResume(
+      resume: resume,
+      keywords: keywords,
+      matchedKeywords: matched,
+    );
+  }
+
   List<String> _extractKeywords(String text) {
     final counts = <String, int>{};
     final words = RegExp(r"[a-zA-Z][a-zA-Z0-9.+#-]{2,}")

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
+import '../services/ai_resume_service.dart';
 import '../services/app_state.dart';
 import '../widgets/job_card.dart';
 import '../widgets/modern_ui.dart';
@@ -92,22 +95,35 @@ class _JobsScreenState extends State<JobsScreen> {
                 )
               else
                 ...jobs.map(
-                  (job) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: JobCard(
-                      job: job,
-                      isSaved: state.isJobSaved(job.id),
-                      isTracked: state.isTracked(job.id),
-                      onSave: () => state.toggleSaveJob(job),
-                      onTrack: () => state.addToTracker(job),
-                      onView: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => JobDetailScreen(job: job),
+                  (job) {
+                    final resumeText = state.profile.resumeText;
+                    final matchScore = resumeText.isNotEmpty 
+                        ? const AiResumeService().calculateMatchScore(
+                            resumeText: resumeText, 
+                            targetJobDescription: '${job.title} ${job.description} ${job.category}',
+                          ) 
+                        : null;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: JobCard(
+                        job: job,
+                        isSaved: state.isJobSaved(job.id),
+                        isTracked: state.isTracked(job.id),
+                        matchScore: matchScore,
+                        onSave: () => state.toggleSaveJob(job),
+                        onTrack: () => state.addToTracker(job),
+                        onView: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => JobDetailScreen(job: job),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
+              const SizedBox(height: 24),
+              const _JobBoardsSection(),
+              const SizedBox(height: 40),
             ],
           ),
         );
@@ -373,6 +389,93 @@ class _StatusBanner extends StatelessWidget {
               message,
               style: TextStyle(color: theme.colorScheme.onSecondaryContainer),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JobBoardsSection extends StatelessWidget {
+  const _JobBoardsSection();
+
+  static const _boards = [
+    ('Toptal', 'https://toptal.com'),
+    ('Skip The Drive', 'https://skipthedrive.com'),
+    ('NoDesk', 'https://nodesk.co'),
+    ('RemoteHabits', 'https://remotehabits.com'),
+    ('Remotive', 'https://remotive.com'),
+    ('Remote4Me', 'https://remote4me.com'),
+    ('Pangian', 'https://pangian.com'),
+    ('Remotees', 'https://remotees.com'),
+    ('justremote', 'https://justremote.co'),
+    ('Remotecrew', 'https://remotecrew.io'),
+    ('Europe Remotely', 'https://europeremotely.com'),
+    ('FlexJobs', 'https://flexjobs.com'),
+    ('Remote.co', 'https://remote.co'),
+    ('We Work Remotely', 'https://weworkremotely.com'),
+    ('Remote OK', 'https://remoteok.com'),
+    ('AngelList', 'https://angel.co'),
+    ('LinkedIn', 'https://linkedin.com'),
+    ('Freelancer', 'https://freelancer.com'),
+    ('Working Nomads', 'https://workingnomads.com'),
+    ('SimplyHired', 'https://simplyhired.com'),
+    ('Jobspresso', 'https://jobspresso.co'),
+    ('Virtual Vocations', 'https://virtualvocations.com'),
+    ('Glassdoor', 'https://glassdoor.com'),
+    ('Monster', 'https://monster.com'),
+  ];
+
+  static const _resumeBuilders = [
+    ('Canva', 'https://canva.com'),
+    ('Resume Genius', 'https://resumegenius.com'),
+    ('Zety', 'https://zety.com'),
+    ('Novoresume', 'https://novoresume.com'),
+    ('Resume.com', 'https://resume.com'),
+    ('VisualCV', 'https://visualcv.com'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Explore 30+ Job Boards',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _boards
+                .map((b) => ActionChip(
+                      label: Text(b.$1),
+                      onPressed: () => launchUrl(Uri.parse(b.$2)),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Resume Builders',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _resumeBuilders
+                .map((b) => ActionChip(
+                      label: Text(b.$1),
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      onPressed: () => launchUrl(Uri.parse(b.$2)),
+                    ))
+                .toList(),
           ),
         ],
       ),

@@ -6,6 +6,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:xml/xml.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import '../models/resume_result.dart';
 import '../services/app_state.dart';
@@ -258,7 +260,9 @@ class _ResumeAiScreenState extends State<ResumeAiScreen> {
       final file = result.files.single;
       final bytes = file.bytes ??
           (file.path == null ? null : await File(file.path!).readAsBytes());
-      final text = _decodeResumeFile(file.name, bytes);
+      
+      _showUploadMessage('Reading file...');
+      final text = await _decodeResumeFileAsync(file.name, file.path, bytes);
 
       if (text.trim().isEmpty) {
         _showUploadMessage(
@@ -276,18 +280,47 @@ class _ResumeAiScreenState extends State<ResumeAiScreen> {
     }
   }
 
-  String _decodeResumeFile(String fileName, List<int>? bytes) {
+  Future<String> _decodeResumeFileAsync(String fileName, String? filePath, List<int>? bytes) async {
     if (bytes == null || bytes.isEmpty) return '';
     final name = fileName.toLowerCase();
-    if (name.endsWith('.docx')) {
+    if (name.endsWith('.docx') || name.endsWith('.doc')) {
       return _extractDocxText(bytes);
     }
     if (name.endsWith('.pdf')) {
-      return _extractSimplePdfText(bytes);
+      return _extractRealPdfText(bytes);
+    }
+    if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')) {
+      if (filePath != null) {
+        return await _extractImageText(filePath);
+      }
     }
     return _readableOrEmpty(
       _cleanUploadedText(utf8.decode(bytes, allowMalformed: true)),
     );
+  }
+
+  String _extractRealPdfText(List<int> bytes) {
+    try {
+      final document = PdfDocument(inputBytes: bytes);
+      final extractor = PdfTextExtractor(document);
+      final text = extractor.extractText();
+      document.dispose();
+      return _readableOrEmpty(_cleanUploadedText(text));
+    } catch (_) {
+      return _extractSimplePdfText(bytes);
+    }
+  }
+
+  Future<String> _extractImageText(String path) async {
+    try {
+      final inputImage = InputImage.fromFilePath(path);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final recognizedText = await textRecognizer.processImage(inputImage);
+      await textRecognizer.close();
+      return _readableOrEmpty(_cleanUploadedText(recognizedText.text));
+    } catch (_) {
+      return '';
+    }
   }
 
   String _extractDocxText(List<int> bytes) {
