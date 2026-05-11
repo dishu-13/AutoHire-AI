@@ -46,6 +46,19 @@ class AppState extends ChangeNotifier {
   List<Job> _jobs = [];
   List<Job> _savedJobs = [];
   List<ApplicationRecord> _applications = [];
+  List<Job>? _filteredJobsCache;
+  String? _filteredJobsCacheKey;
+  int _jobsVersion = 0;
+  int _applicationsVersion = 0;
+  int _timelineCacheVersion = -1;
+  int _statusCountsCacheVersion = -1;
+  int _successRateCacheVersion = -1;
+  List<ApplicationRecord>? _timelineCache;
+  Map<ApplicationStatus, int>? _statusCountsCache;
+  double? _successRateCache;
+  final Map<String, int> _matchScoreCache = {};
+  final Map<String, bool> _indiaFriendlyCache = {};
+  final Map<String, bool> _fastHiringCache = {};
 
   UserProfile profile = UserProfile.empty();
   User? user;
@@ -72,10 +85,23 @@ class AppState extends ChangeNotifier {
   bool get hasResumeResult => resumeResult != null;
 
   List<Job> get filteredJobs {
+    final cacheKey = [
+      _jobsVersion,
+      roleFilter.trim().toLowerCase(),
+      locationFilter.trim().toLowerCase(),
+      minimumSalary,
+      indiaFriendlyOnly,
+      fastHiringOnly,
+    ].join('|');
+    final cached = _filteredJobsCache;
+    if (_filteredJobsCacheKey == cacheKey && cached != null) {
+      return cached;
+    }
+
     final role = roleFilter.trim().toLowerCase();
     final location = locationFilter.trim().toLowerCase();
 
-    return _jobs.where((job) {
+    final filtered = _jobs.where((job) {
       final roleMatches = role.isEmpty ||
           job.title.toLowerCase().contains(role) ||
           job.company.toLowerCase().contains(role) ||
@@ -85,24 +111,44 @@ class AppState extends ChangeNotifier {
       final salaryMatches = minimumSalary == 0 ||
           (job.salaryMax != null && job.salaryMax! >= minimumSalary) ||
           (job.salaryMin != null && job.salaryMin! >= minimumSalary);
-      final indiaMatches = !indiaFriendlyOnly || job.isIndiaFriendly;
-      final fastHiringMatches = !fastHiringOnly || job.hasFastHiringSignal;
+      final indiaMatches = !indiaFriendlyOnly || _isIndiaFriendly(job);
+      final fastHiringMatches = !fastHiringOnly || _hasFastHiringSignal(job);
       return roleMatches &&
           locationMatches &&
           salaryMatches &&
           indiaMatches &&
           fastHiringMatches;
     }).toList();
+
+    _filteredJobsCacheKey = cacheKey;
+    _filteredJobsCache = List.unmodifiable(filtered);
+    return _filteredJobsCache!;
   }
 
   Map<ApplicationStatus, int> get statusCounts {
-    return {
-      for (final status in ApplicationStatus.values)
-        status: _applications.where((record) => record.status == status).length,
+    final cached = _statusCountsCache;
+    if (_statusCountsCacheVersion == _applicationsVersion && cached != null) {
+      return cached;
+    }
+
+    final counts = {
+      for (final status in ApplicationStatus.values) status: 0,
     };
+    for (final record in _applications) {
+      counts[record.status] = (counts[record.status] ?? 0) + 1;
+    }
+
+    _statusCountsCacheVersion = _applicationsVersion;
+    _statusCountsCache = Map.unmodifiable(counts);
+    return _statusCountsCache!;
   }
 
   double get successRate {
+    final cached = _successRateCache;
+    if (_successRateCacheVersion == _applicationsVersion && cached != null) {
+      return cached;
+    }
+
     final decided = _applications
         .where(
           (record) =>
@@ -110,17 +156,30 @@ class AppState extends ChangeNotifier {
               record.status == ApplicationStatus.rejected,
         )
         .length;
-    if (decided == 0) return 0;
+    if (decided == 0) {
+      _successRateCacheVersion = _applicationsVersion;
+      _successRateCache = 0;
+      return _successRateCache!;
+    }
     final offers = _applications
         .where((record) => record.status == ApplicationStatus.offer)
         .length;
-    return offers / decided;
+    _successRateCacheVersion = _applicationsVersion;
+    _successRateCache = offers / decided;
+    return _successRateCache!;
   }
 
   List<ApplicationRecord> get timeline {
+    final cached = _timelineCache;
+    if (_timelineCacheVersion == _applicationsVersion && cached != null) {
+      return cached;
+    }
+
     final copy = [..._applications];
     copy.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return copy;
+    _timelineCacheVersion = _applicationsVersion;
+    _timelineCache = List.unmodifiable(copy);
+    return _timelineCache!;
   }
 
   List<String> searchSuggestionsFor(String query) {
@@ -152,7 +211,10 @@ class AppState extends ChangeNotifier {
   Future<void> bootstrap() async {
     _loadLocalState();
     _listenToAuthState();
-    await refreshJobs(silent: true);
+    if (_jobs.isEmpty) {
+      _setJobs(JobsApiService.sampleJobs());
+    }
+    unawaited(refreshJobs());
   }
 
   Future<void> refreshJobs({bool silent = false}) async {
@@ -163,13 +225,15 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      _jobs = await _jobsApiService.fetchJobs(
-        search: roleFilter.trim().isEmpty ? null : roleFilter,
+      _setJobs(
+        await _jobsApiService.fetchJobs(
+          search: roleFilter.trim().isEmpty ? null : roleFilter,
+        ),
       );
       jobsError = _jobs.isEmpty ? 'No live jobs matched this search.' : null;
     } catch (_) {
       if (_jobs.isEmpty) {
-        _jobs = JobsApiService.sampleJobs();
+        _setJobs(JobsApiService.sampleJobs());
       }
       jobsError =
           'Live portals are not reachable right now. Showing starter roles.';
@@ -180,31 +244,44 @@ class AppState extends ChangeNotifier {
   }
 
   void setRoleFilter(String value) {
+    if (roleFilter == value) return;
     roleFilter = value;
     notifyListeners();
   }
 
   void setLocationFilter(String value) {
+    if (locationFilter == value) return;
     locationFilter = value;
     notifyListeners();
   }
 
   void setMinimumSalary(int value) {
-    minimumSalary = max(0, value);
+    final next = max(0, value);
+    if (minimumSalary == next) return;
+    minimumSalary = next;
     notifyListeners();
   }
 
   void setIndiaFriendlyOnly(bool value) {
+    if (indiaFriendlyOnly == value) return;
     indiaFriendlyOnly = value;
     notifyListeners();
   }
 
   void setFastHiringOnly(bool value) {
+    if (fastHiringOnly == value) return;
     fastHiringOnly = value;
     notifyListeners();
   }
 
   void clearJobFilters() {
+    if (roleFilter.isEmpty &&
+        locationFilter.isEmpty &&
+        minimumSalary == 0 &&
+        indiaFriendlyOnly &&
+        !fastHiringOnly) {
+      return;
+    }
     roleFilter = '';
     locationFilter = '';
     minimumSalary = 0;
@@ -236,7 +313,7 @@ class AppState extends ChangeNotifier {
   Future<void> addToTracker(Job job) async {
     if (isTracked(job.id)) return;
     final record = ApplicationRecord.fromJob(job);
-    _applications = [record, ..._applications];
+    _setApplications([record, ..._applications]);
     await firebaseService.upsertApplication(record);
     await _persistApplications();
     notifyListeners();
@@ -250,9 +327,11 @@ class AppState extends ChangeNotifier {
       status: status,
       updatedAt: DateTime.now(),
     );
-    _applications = _applications
-        .map((candidate) => candidate.id == record.id ? updated : candidate)
-        .toList();
+    _setApplications(
+      _applications
+          .map((candidate) => candidate.id == record.id ? updated : candidate)
+          .toList(),
+    );
     await firebaseService.upsertApplication(updated);
     await _persistApplications();
     notifyListeners();
@@ -266,16 +345,22 @@ class AppState extends ChangeNotifier {
       notes: notes,
       updatedAt: DateTime.now(),
     );
-    _applications = _applications
-        .map((candidate) => candidate.id == record.id ? updated : candidate)
-        .toList();
+    _setApplications(
+      _applications
+          .map((candidate) => candidate.id == record.id ? updated : candidate)
+          .toList(),
+    );
     await firebaseService.upsertApplication(updated);
     await _persistApplications();
     notifyListeners();
   }
 
   Future<void> removeApplication(ApplicationRecord record) async {
-    _applications.removeWhere((candidate) => candidate.id == record.id);
+    _setApplications(
+      _applications
+          .where((candidate) => candidate.id != record.id)
+          .toList(growable: false),
+    );
     await firebaseService.deleteApplication(record.id);
     await _persistApplications();
     notifyListeners();
@@ -291,6 +376,8 @@ class AppState extends ChangeNotifier {
     String? preferredLocation,
     String? salaryExpectation,
   }) async {
+    final shouldClearMatchCache =
+        resumeText != null && resumeText != profile.resumeText;
     profile = profile.copyWith(
       name: name,
       email: email,
@@ -301,6 +388,9 @@ class AppState extends ChangeNotifier {
       preferredLocation: preferredLocation,
       salaryExpectation: salaryExpectation,
     );
+    if (shouldClearMatchCache) {
+      _matchScoreCache.clear();
+    }
     await _persistProfile();
     await firebaseService.saveProfile(profile);
     notifyListeners();
@@ -329,6 +419,7 @@ class AppState extends ChangeNotifier {
       );
       resumeResult = result;
       profile = profile.copyWith(resumeText: resumeText);
+      _matchScoreCache.clear();
       await _persistProfile();
       await _persistResumeResult();
       await firebaseService.saveProfile(profile);
@@ -408,8 +499,9 @@ class AppState extends ChangeNotifier {
       if (value == null) {
         _cancelUserCloudSubscriptions();
         _savedJobs = [];
-        _applications = [];
+        _setApplications(const []);
         profile = UserProfile.empty();
+        _matchScoreCache.clear();
       } else {
         profile = profile.copyWith(
           name: value.displayName ?? profile.name,
@@ -428,7 +520,11 @@ class AppState extends ChangeNotifier {
 
     _profileSubscription = firebaseService.profileStream().listen((value) {
       if (value == null) return;
+      final shouldClearMatchCache = value.resumeText != profile.resumeText;
       profile = value;
+      if (shouldClearMatchCache) {
+        _matchScoreCache.clear();
+      }
       unawaited(_persistProfile());
       notifyListeners();
     });
@@ -441,7 +537,7 @@ class AppState extends ChangeNotifier {
 
     _applicationsSubscription =
         firebaseService.applicationsStream().listen((value) {
-      _applications = value;
+      _setApplications(value);
       unawaited(_persistApplications());
       notifyListeners();
     });
@@ -483,13 +579,15 @@ class AppState extends ChangeNotifier {
 
     final applicationsJson = preferences.getString(_applicationsKey);
     if (applicationsJson != null) {
-      _applications = (jsonDecode(applicationsJson) as List)
-          .map(
-            (item) => ApplicationRecord.fromMap(
-              Map<String, dynamic>.from(item as Map),
-            ),
-          )
-          .toList();
+      _setApplications(
+        (jsonDecode(applicationsJson) as List)
+            .map(
+              (item) => ApplicationRecord.fromMap(
+                Map<String, dynamic>.from(item as Map),
+              ),
+            )
+            .toList(),
+      );
     }
 
     final resumeResultJson = preferences.getString(_resumeResultKey);
@@ -524,6 +622,56 @@ class AppState extends ChangeNotifier {
       return preferences.remove(_resumeResultKey);
     }
     return preferences.setString(_resumeResultKey, jsonEncode(result.toMap()));
+  }
+
+  int? matchScoreFor(Job job) {
+    final resumeText = profile.resumeText.trim();
+    if (resumeText.isEmpty) return null;
+
+    final key = Object.hash(
+      resumeText,
+      job.id,
+      job.title,
+      job.description,
+      job.category,
+    ).toString();
+
+    return _matchScoreCache.putIfAbsent(
+      key,
+      () => _aiResumeService.calculateMatchScore(
+        resumeText: resumeText,
+        targetJobDescription: '${job.title} ${job.description} ${job.category}',
+      ),
+    );
+  }
+
+  bool _isIndiaFriendly(Job job) {
+    return _indiaFriendlyCache.putIfAbsent(job.id, () => job.isIndiaFriendly);
+  }
+
+  bool _hasFastHiringSignal(Job job) {
+    return _fastHiringCache.putIfAbsent(
+      job.id,
+      () => job.hasFastHiringSignal,
+    );
+  }
+
+  void _setJobs(List<Job> jobs) {
+    _jobs = jobs;
+    _jobsVersion++;
+    _filteredJobsCache = null;
+    _filteredJobsCacheKey = null;
+    _indiaFriendlyCache.clear();
+    _fastHiringCache.clear();
+    _matchScoreCache.clear();
+  }
+
+  void _setApplications(List<ApplicationRecord> applications) {
+    _applications = applications;
+    _applicationsVersion++;
+    _timelineCache = null;
+    _statusCountsCache = null;
+    _successRateCache = null;
   }
 
   @override

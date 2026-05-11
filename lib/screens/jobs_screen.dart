@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
-import '../services/ai_resume_service.dart';
 import '../services/app_state.dart';
 import '../widgets/job_card.dart';
 import '../widgets/modern_ui.dart';
@@ -41,89 +40,117 @@ class _JobsScreenState extends State<JobsScreen> {
     return Consumer<AppState>(
       builder: (context, state, child) {
         final jobs = state.filteredJobs;
+        const pagePadding = EdgeInsets.fromLTRB(16, 14, 16, 88);
 
         return RefreshIndicator(
           onRefresh: state.refreshJobs,
-          child: ModernPage(
-            children: [
-              _JobsHero(
-                roleController: _roleController,
-                jobCount: jobs.length,
-                totalCount: state.jobs.length,
-                onFilterTap: () {
-                  setState(() => _showFilters = !_showFilters);
-                },
+          child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            cacheExtent: 720,
+            slivers: [
+              SliverPadding(
+                padding: pagePadding.copyWith(bottom: 0),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate(
+                    [
+                      _JobsHero(
+                        roleController: _roleController,
+                        jobCount: jobs.length,
+                        totalCount: state.jobs.length,
+                        onFilterTap: () {
+                          setState(() => _showFilters = !_showFilters);
+                        },
+                      ),
+                      if (_showFilters) ...[
+                        const SizedBox(height: 12),
+                        _FilterPanel(
+                          locationController: _locationController,
+                          onClear: () {
+                            state.clearJobFilters();
+                            _roleController.clear();
+                            _locationController.clear();
+                          },
+                        ),
+                      ],
+                      if (state.jobsError != null) ...[
+                        const SizedBox(height: 12),
+                        _StatusBanner(message: state.jobsError!),
+                      ],
+                      if (state.isLoadingJobs) ...[
+                        const SizedBox(height: 12),
+                        const LinearProgressIndicator(),
+                      ],
+                      const SizedBox(height: 20),
+                      if (jobs.isNotEmpty)
+                        Text(
+                          'Latest roles',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      if (jobs.isNotEmpty) const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
               ),
-              if (_showFilters) ...[
-                const SizedBox(height: 12),
-                _FilterPanel(
-                  locationController: _locationController,
-                  onClear: () {
-                    state.clearJobFilters();
-                    _roleController.clear();
-                    _locationController.clear();
-                  },
-                ),
-              ],
-              if (state.jobsError != null) ...[
-                const SizedBox(height: 12),
-                _StatusBanner(message: state.jobsError!),
-              ],
-              if (state.isLoadingJobs) ...[
-                const SizedBox(height: 12),
-                const LinearProgressIndicator(),
-              ],
-              const SizedBox(height: 20),
-              if (jobs.isNotEmpty)
-                Text(
-                  'Latest roles',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              if (jobs.isNotEmpty) const SizedBox(height: 10),
               if (jobs.isEmpty)
-                EmptyActionCard(
-                  icon: Icons.search,
-                  title: 'No jobs found',
-                  message:
-                      'Try a different search or pull down to refresh from live portals',
-                  actionLabel: 'Clear filters',
-                  onAction: () {
-                    state.clearJobFilters();
-                    _roleController.clear();
-                    _locationController.clear();
-                  },
+                SliverPadding(
+                  padding: pagePadding.copyWith(top: 0, bottom: 24),
+                  sliver: SliverToBoxAdapter(
+                    child: EmptyActionCard(
+                      icon: Icons.search,
+                      title: 'No jobs found',
+                      message:
+                          'Try a different search or pull down to refresh from live portals',
+                      actionLabel: 'Clear filters',
+                      onAction: () {
+                        state.clearJobFilters();
+                        _roleController.clear();
+                        _locationController.clear();
+                      },
+                    ),
+                  ),
                 )
               else
-                ...jobs.map(
-                  (job) {
-                    final resumeText = state.profile.resumeText;
-                    final matchScore = resumeText.isNotEmpty 
-                        ? const AiResumeService().calculateMatchScore(
-                            resumeText: resumeText, 
-                            targetJobDescription: '${job.title} ${job.description} ${job.category}',
-                          ) 
-                        : null;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: JobCard(
-                        job: job,
-                        isSaved: state.isJobSaved(job.id),
-                        isTracked: state.isTracked(job.id),
-                        matchScore: matchScore,
-                        onSave: () => state.toggleSaveJob(job),
-                        onTrack: () => state.addToTracker(job),
-                        onView: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => JobDetailScreen(job: job),
+                SliverPadding(
+                  padding: pagePadding.copyWith(top: 0, bottom: 12),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final job = jobs[index];
+                        return RepaintBoundary(
+                          key: ValueKey(job.id),
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: JobCard(
+                              job: job,
+                              isSaved: state.isJobSaved(job.id),
+                              isTracked: state.isTracked(job.id),
+                              matchScore: state.matchScoreFor(job),
+                              onSave: () => state.toggleSaveJob(job),
+                              onTrack: () => state.addToTracker(job),
+                              onView: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => JobDetailScreen(job: job),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  },
+                        );
+                      },
+                      childCount: jobs.length,
+                    ),
+                  ),
                 ),
-              const SizedBox(height: 24),
-              const _JobBoardsSection(),
-              const SizedBox(height: 40),
+              SliverPadding(
+                padding: pagePadding.copyWith(top: 12),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate(
+                    const [
+                      _JobBoardsSection(),
+                      SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -472,7 +499,8 @@ class _JobBoardsSection extends StatelessWidget {
             children: _resumeBuilders
                 .map((b) => ActionChip(
                       label: Text(b.$1),
-                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
                       onPressed: () => launchUrl(Uri.parse(b.$2)),
                     ))
                 .toList(),

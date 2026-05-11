@@ -260,7 +260,7 @@ class _ResumeAiScreenState extends State<ResumeAiScreen> {
       final file = result.files.single;
       final bytes = file.bytes ??
           (file.path == null ? null : await File(file.path!).readAsBytes());
-      
+
       _showUploadMessage('Reading file...');
       final text = await _decodeResumeFileAsync(file.name, file.path, bytes);
 
@@ -280,7 +280,8 @@ class _ResumeAiScreenState extends State<ResumeAiScreen> {
     }
   }
 
-  Future<String> _decodeResumeFileAsync(String fileName, String? filePath, List<int>? bytes) async {
+  Future<String> _decodeResumeFileAsync(
+      String fileName, String? filePath, List<int>? bytes) async {
     if (bytes == null || bytes.isEmpty) return '';
     final name = fileName.toLowerCase();
     if (name.endsWith('.docx') || name.endsWith('.doc')) {
@@ -289,7 +290,9 @@ class _ResumeAiScreenState extends State<ResumeAiScreen> {
     if (name.endsWith('.pdf')) {
       return _extractRealPdfText(bytes);
     }
-    if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')) {
+    if (name.endsWith('.png') ||
+        name.endsWith('.jpg') ||
+        name.endsWith('.jpeg')) {
       if (filePath != null) {
         return await _extractImageText(filePath);
       }
@@ -314,7 +317,8 @@ class _ResumeAiScreenState extends State<ResumeAiScreen> {
   Future<String> _extractImageText(String path) async {
     try {
       final inputImage = InputImage.fromFilePath(path);
-      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final textRecognizer =
+          TextRecognizer(script: TextRecognitionScript.latin);
       final recognizedText = await textRecognizer.processImage(inputImage);
       await textRecognizer.close();
       return _readableOrEmpty(_cleanUploadedText(recognizedText.text));

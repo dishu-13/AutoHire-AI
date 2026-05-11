@@ -13,8 +13,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final firebaseService = FirebaseService();
-  await firebaseService.initialize();
-  final preferences = await SharedPreferences.getInstance();
+  final firebaseInit = firebaseService.initialize();
+  final preferencesFuture = SharedPreferences.getInstance();
+  await firebaseInit;
+  final preferences = await preferencesFuture;
 
   final appState = AppState(
     firebaseService: firebaseService,
@@ -169,13 +171,13 @@ class _SplashGateState extends State<_SplashGate>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 320),
     )..forward();
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
     _scale = Tween<double>(begin: 0.88, end: 1).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
-    Future<void>.delayed(const Duration(milliseconds: 1200), () {
+    Future<void>.delayed(const Duration(milliseconds: 420), () {
       if (mounted) setState(() => _done = true);
     });
   }

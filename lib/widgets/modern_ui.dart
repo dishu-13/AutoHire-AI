@@ -137,9 +137,9 @@ class ModernCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.055),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -280,9 +280,9 @@ class PurpleHero extends StatelessWidget {
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: ModernColors.purple.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: ModernColors.purple.withValues(alpha: 0.22),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),

@@ -16,34 +16,49 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  final Set<int> _visitedTabs = {0};
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      const JobsScreen(),
+      const ResumeAiScreen(),
+      TrackerScreen(onBrowseJobs: () => setState(() => _index = 0)),
+      const DashboardScreen(),
+      const ProfileScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: _screenForIndex()),
+      body: SafeArea(
+        child: IndexedStack(
+          index: _index,
+          children: List.generate(
+            _screens.length,
+            (index) => _visitedTabs.contains(index)
+                ? _screens[index]
+                : const SizedBox.shrink(),
+          ),
+        ),
+      ),
       extendBody: true,
       bottomNavigationBar: _PillNavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
+        onDestinationSelected: _selectTab,
       ),
     );
   }
 
-  Widget _screenForIndex() {
-    switch (_index) {
-      case 0:
-        return const JobsScreen();
-      case 1:
-        return const ResumeAiScreen();
-      case 2:
-        return TrackerScreen(onBrowseJobs: () => setState(() => _index = 0));
-      case 3:
-        return const DashboardScreen();
-      case 4:
-        return const ProfileScreen();
-      default:
-        return const JobsScreen();
-    }
+  void _selectTab(int value) {
+    if (_index == value) return;
+    setState(() {
+      _index = value;
+      _visitedTabs.add(value);
+    });
   }
 }
 
