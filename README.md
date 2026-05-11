@@ -69,14 +69,6 @@ Dive deeper into the architecture and setup by reading our comprehensive guides 
 - 🏗 [`production_architecture.md`](docs/production_architecture.md) - Deep dive into our state management and services.
 - ⚙️ [`run_and_build_guide.md`](docs/run_and_build_guide.md) - Advanced build instructions for production.
 
-## 🤖 CI/CD Automation
-
-This repository is equipped with **GitHub Actions**. Every time code is pushed to the `main` branch, our pipeline automatically:
-1. Sets up Java 17 and Flutter stable.
-2. Fetches dependencies and builds a release-ready Android APK.
-3. Uploads the fresh `.apk` directly to the **[GitHub Releases](https://github.com/dishu-13/AutoHire-AI/releases)** page under the "Latest Build" tag.
-
----
 
 <div align="center">
   <i>Built with ❤️ using Flutter and Firebase</i>
