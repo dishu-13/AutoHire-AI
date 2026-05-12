@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/application_record.dart';
 import '../models/job.dart';
+import '../models/resume_document.dart';
 import '../models/resume_result.dart';
 import '../models/user_profile.dart';
 import 'ai_resume_service.dart';
@@ -432,12 +433,26 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> exportTailoredResumePdf() async {
+  Future<void> exportTailoredResumePdf({
+    String templateStyle = 'Modern ATS',
+  }) async {
     final result = resumeResult;
     if (result == null) return;
     await _pdfService.exportResume(
       result: result,
       candidateName: profile.name,
+      templateStyle: templateStyle,
+    );
+  }
+
+  Future<void> exportResumeDocumentPdf({
+    required ResumeDocument document,
+    required String templateStyle,
+  }) async {
+    await updateProfile(resumeText: document.toPlainText());
+    await _pdfService.exportResumeDocument(
+      document: document,
+      templateStyle: templateStyle,
     );
   }
 

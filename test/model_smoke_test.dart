@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_job_assistant/models/application_record.dart';
 import 'package:smart_job_assistant/models/job.dart';
+import 'package:smart_job_assistant/models/resume_document.dart';
 import 'package:smart_job_assistant/services/ai_resume_service.dart';
 
 void main() {
@@ -67,5 +68,38 @@ void main() {
     expect(result.keywords, isNotEmpty);
     expect(result.optimizedResume, contains('TARGET ROLE ALIGNMENT'));
     expect(result.coverLetter, contains('Dear Hiring Team'));
+  });
+
+  test('resume document builds structured plain text', () {
+    const document = ResumeDocument(
+      name: 'Dishu',
+      headline: 'Flutter Developer',
+      email: 'dishu@example.com',
+      phone: '+91 99999 99999',
+      location: 'India',
+      links: ['github.com/dishu'],
+      summary: 'Flutter developer building Firebase-backed Android apps.',
+      skills: ['Flutter', 'Firebase', 'Dart'],
+      experiences: [
+        ResumeExperience(
+          role: 'Developer',
+          company: 'AutoHire AI',
+          period: '2026',
+          location: 'Remote',
+          bullets: ['Built resume PDF export with templates.'],
+        ),
+      ],
+      projects: [],
+      education: [],
+      certifications: ['Flutter development'],
+    );
+
+    final text = document.toPlainText();
+
+    expect(document.hasContent, isTrue);
+    expect(document.wordCount, greaterThan(10));
+    expect(text, contains('SUMMARY'));
+    expect(text, contains('EXPERIENCE'));
+    expect(text, contains('Built resume PDF export'));
   });
 }
